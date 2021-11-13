@@ -34,7 +34,6 @@ class JsonTreeWidget(QtWidgets.QWidget):
         self.json_tree = data_tree.DataTreeWidget()
 
         self.batch_modify_widget = batch_widget.BatchModifyWidget()
-        self.batch_modify_widget.prefix_line_edit.setText("SOME_")
 
         ###########################################################
         # JSON tree specific ui
