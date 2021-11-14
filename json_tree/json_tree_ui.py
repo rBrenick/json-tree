@@ -23,6 +23,7 @@ class JsonTreeWidget(QtWidgets.QWidget):
             settings_name="JsonTree",
             file_filter="JSON (*.json)",
             recent_paths_amount=100,
+            only_show_existing_recent_paths=True,
         )
 
         self.filter_widget = QtWidgets.QLineEdit()
@@ -79,7 +80,6 @@ class JsonTreeWidget(QtWidgets.QWidget):
     def save_json(self):
         json_path = self.path_widget.path()
         data_from_ui = self.json_tree.get_tree_data()
-        json_path = json_path.replace(".json", "_TEST.json")
         system.save_json(data_from_ui, json_path)
         print("Saved Json to: {}".format(json_path))
 

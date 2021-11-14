@@ -54,7 +54,7 @@ class DataModelItem(object):
 
     def get_unique_key(self, target_name=""):
         if self.parent.raw_data_type in lk.list_types:
-            return ""
+            return "[{}]".format(self.parent.children.index(self))
 
         # make sure this value isn't blank
         if target_name == "":
@@ -72,7 +72,6 @@ class DataModelItem(object):
         return len(self.children)
 
     def add_child(self, child_item, index=None):
-
         child_item.parent = self
         if index is None:
             child_item.row = self.child_count()
@@ -193,7 +192,7 @@ class DataModel(QtCore.QAbstractItemModel):
                 elif item.raw_data_type == bool:
                     return str(item.data_value).title()
                 elif item.raw_data_type in lk.supports_children_types:
-                    return "----"
+                    return "-------- {} items --------".format(item.child_count())
                 return str(item.data_value)
 
             if column == lk.col_type:
@@ -233,8 +232,7 @@ class DataModel(QtCore.QAbstractItemModel):
         self.endRemoveRows()
         return True
 
-    def moveRow(self, sourceParent: QtCore.QModelIndex, sourceRow: int, destinationParent: QtCore.QModelIndex,
-                destinationChild: int):
+    def moveRow(self, sourceParent, sourceRow, destinationParent, destinationChild):
         self.beginMoveRows(sourceParent, sourceRow, sourceRow, destinationParent, destinationChild)
         index = self.index(sourceRow, lk.col_key, sourceParent)
 
@@ -265,10 +263,36 @@ class DataModel(QtCore.QAbstractItemModel):
                 yield grand_child
 
     def set_data(self, data):
+        self.beginResetModel()
         self.root_item = DataModelItem(data_value=type(data)())
         if data is None:
             return
         self.add_data_to_model(data_value=data, parent_item=self.root_item)
+        self.endResetModel()
+
+    def get_index_from_item(self, item):
+        # TODO: improve this with UUIDs or something
+        for index in self.get_all_indices():
+            if index.internalPointer() is item:
+                return index
+        return QtCore.QModelIndex()
+
+    def add_data_to_indices(self, index_data_map, merge=True):
+        for index_data in index_data_map:
+            index = index_data[0]
+            data = index_data[1]
+
+            item = index.internalPointer()
+
+            data_length = get_data_length(data)
+            start = item.child_count()
+            end = start + data_length - 1
+
+            self.beginInsertRows(index, start, end)
+
+            self.add_data_to_model(data_value=data, parent_item=item, merge=merge, key_safety=True)
+
+            self.endInsertRows()
 
     def add_data_to_model(self, data_key="", data_value=None, parent_item=None, merge=False, key_safety=False):
         if isinstance(data_value, lk.dict_types):
@@ -333,16 +357,53 @@ class DataSortFilterProxyModel(QtCore.QSortFilterProxyModel):
         self.setSortCaseSensitivity(Qt.CaseInsensitive)
         self.setFilterCaseSensitivity(Qt.CaseInsensitive)
 
-    # def filterAcceptsRow(self, sourceRow, sourceParent):
-    #     return True
-    # index = self.sourceModel().index(sourceRow, 0, sourceParent)
-    # if not index.isValid():
-    #     print("invalid", index)
-    #     return False
-    # regex = self.filterRegExp()
-    # item = index.internalPointer()  # type: DataModelItem
-    # print(item.data_key)
-    # return True
+    def get_all_indices(self, index=None, persistent=False):
+        if not index:
+            index = QtCore.QModelIndex()
+
+        for i in range(self.rowCount(index)):
+            child = self.index(i, 0, index)
+            if persistent:
+                child = QtCore.QPersistentModelIndex(child)
+            yield child
+            for grand_child in self.get_all_indices(child, persistent=persistent):
+                yield grand_child
+
+    def get_index_from_item(self, item):
+        for index in self.get_all_indices():
+            if index.internalPointer() is item:
+                return index
+        return QtCore.QModelIndex()
+
+
+def get_data_length(data):
+    if isinstance(data, lk.dict_types):
+        return len(data.keys())
+    elif isinstance(data, lk.list_types):
+        return len(data)
+    return 1
+
+
+def recursive_get_data_length(data, merge=False):
+    data_length = 0
+    if isinstance(data, lk.dict_types):
+        if not merge:
+            data_length += 1
+
+        for k, v in data.items():
+            data_length += recursive_get_data_length(v, merge)
+
+    elif isinstance(data, lk.list_types):
+        if not merge:
+            data_length += 1
+
+        for v in data:
+            data_length += recursive_get_data_length(v, merge)
+
+    else:
+        data_length += 1
+
+    return data_length
 
 
 def test_data_model_view():
@@ -364,12 +425,10 @@ def test_data_model_view():
         test_data = json.load(fp, object_pairs_hook=OrderedDict)
     model.set_data(test_data)
     ui_data = model.get_data()
-    with open(example_json_path.replace(".json", "_TEST.json"), "w+") as fp:
-        json.dump(ui_data, fp, indent=2)
 
     print("TEST_DATA", test_data)
     print("UI_DATA", ui_data)
-    print(ui_data == test_data)
+    assert (ui_data == test_data)
     ######################################
 
     tree_header = tree.header()

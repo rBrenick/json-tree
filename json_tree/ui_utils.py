@@ -198,6 +198,7 @@ class QtPathWidget(QtWidgets.QWidget):
             use_directory_dialog=False,
             relative_to_path="",
             recent_paths_amount=30,
+            only_show_existing_recent_paths=False
     ):
         """
         QWidget for file paths.
@@ -211,6 +212,7 @@ class QtPathWidget(QtWidgets.QWidget):
         :param use_directory_dialog: browse for folder instead of file path
         :param relative_to_path: show paths relative to this path
         :param recent_paths_amount: clamp recent paths to this amount
+        :param only_show_existing_recent_paths:
         """
 
         super(QtPathWidget, self).__init__(parent)
@@ -236,7 +238,7 @@ class QtPathWidget(QtWidgets.QWidget):
 
         # surprise, it's a QComboBox for the path display
         self.path_CB = QtWidgets.QComboBox()
-        self.path_CB.addItems(self._settings.get_recent_paths())
+        self.path_CB.addItems(self._settings.get_recent_paths(only_existing=only_show_existing_recent_paths))
         self.path_CB.setEditable(True)
         self.path_CB.setCurrentText("")
         self.path_CB.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Fixed)
@@ -349,11 +351,12 @@ class QtPathWidgetSettings(QtCore.QSettings):
         self.relative_to_path = relative_to_path
         self.relative_to_path_drive = os.path.splitdrive(self.relative_to_path)[0]
 
-    def get_recent_paths(self, full_paths=False):
+    def get_recent_paths(self, full_paths=False, only_existing=False):
         """
         Get recent paths from settings
 
         :param full_paths: skip converting to relative paths
+        :param only_existing: only return full existing paths
         :return:
         """
         paths = self.value(self.key_recent_paths)
@@ -363,6 +366,9 @@ class QtPathWidgetSettings(QtCore.QSettings):
                 paths = str(paths).split(", ")
             else:
                 paths = []
+
+        if only_existing:
+            paths = [p for p in paths if os.path.exists(p)]
 
         # convert to relative paths before returning
         if not full_paths and self.relative_to_path:
