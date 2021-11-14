@@ -1,4 +1,3 @@
-import collections
 import os.path
 import sys
 
@@ -88,77 +87,44 @@ class JsonTreeWidget(QtWidgets.QWidget):
         if self.path_widget.open_dialog_and_set_path():
             self.save_json()
 
-    def modify_rename(self):
+    def modify_rename(self, items=None, recursive=None):
+        if items is None:
+            items = self.json_tree.get_selected_items()
+        if recursive is None:
+            recursive = self.modify_hierarchy.isChecked()
+
         modify_keys = "keys" in self.modify_type_chooser.currentText().lower()
         modify_values = "value" in self.modify_type_chooser.currentText().lower()
 
-        for item in self.json_tree.get_selected_items(keys=modify_keys, values=modify_values):
-
-            safe_to_modify = True
-
-            # check we're not trying to modify unsupported types
-            if modify_values and item.column() == data_tree.lk.row_value:
-                item_type = self.json_tree.get_type_from_item(item)
-                if item_type != "str":
-                    safe_to_modify = False
-
-            if safe_to_modify:
-                current_data = item.index().data()
-                modified_data = self.batch_modify_widget.modify_string(current_data)
-                item.setText(modified_data)
-
-            if self.modify_hierarchy.isChecked():
-                self._recursive_item_modify(item, modify_keys=modify_keys, modify_values=modify_values)
-
-    def _recursive_item_modify(self, root_item, modify_keys=True, modify_values=True):
-        for i in range(root_item.rowCount()):
-            key_child_item = root_item.child(i, data_tree.lk.row_key)
-            item_type = self.json_tree.get_type_from_item(key_child_item)
-
-            if modify_keys:
-                current_text = key_child_item.index().data()
-                new_text = self.batch_modify_widget.modify_string(current_text)
-                key_child_item.setText(new_text)
-
-            if modify_values:
-                value_item = root_item.child(i, data_tree.lk.row_value)
-
-                if item_type == "str":
-                    current_text = value_item.index().data()
-                    new_text = self.batch_modify_widget.modify_string(current_text)
-                    value_item.setText(new_text)
-
-            self._recursive_item_modify(key_child_item, modify_keys=modify_keys, modify_values=modify_values)
+        for item in items:  # type: data_tree.data_tree_model.DataModelItem
+            rename_item(
+                item=item,
+                modify_string_func=self.batch_modify_widget.modify_string,
+                mod_key=modify_keys,
+                mod_values=modify_values,
+                recursive=recursive,
+            )
 
     def modify_duplicate(self):
-        self.json_tree.action_duplicate_selected_item(select_new_items=True)
-        self.modify_rename()
+        new_items = self.json_tree.action_duplicate_selected_item(return_new_items=True, key_safety=False)
+        self.modify_rename(new_items, recursive=False)
 
     def test_ui_save_load(self):
         self.path_widget.set_path(EXAMPLE_JSON_PATH)
         self.save_json()
 
 
-def recursive_modify(data, modify_string_func, mod_key, mod_values):
-    if isinstance(data, (dict, collections.OrderedDict)):
-        new_data = collections.OrderedDict()
-        for key, val in data.items():
-            if mod_key:
-                key = modify_string_func(key)
+def rename_item(item, modify_string_func, mod_key, mod_values, recursive=False):
+    if mod_key:
+        item.data_key = modify_string_func(item.data_key)
 
-            new_data[key] = recursive_modify(val, modify_string_func, mod_key, mod_values)
+    if mod_values:
+        if item.data_type == "str":
+            item.set_value(modify_string_func(item.data_value))
 
-    elif isinstance(data, (list, tuple)):
-        new_data = []
-        for val in data:
-            new_val = recursive_modify(val, modify_string_func, mod_key, mod_values)
-            new_data.append(new_val)
-    else:
-        new_data = data
-        if mod_values and type(data) == str:
-            new_data = modify_string_func(data)
-
-    return new_data
+    if recursive:
+        for child in item.children:  # type: data_tree.data_tree_model.DataModelItem
+            rename_item(child, modify_string_func, mod_key, mod_values, recursive=recursive)
 
 
 class JsonTreeWindow(ui_utils.ToolWindow):
