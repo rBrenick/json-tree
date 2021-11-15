@@ -1,4 +1,7 @@
-py -m venv _setup_/standalone/.venv
+WHERE /q py
+IF %ERRORLEVEL% NEQ 0 python -m venv _setup_/standalone/.venv
+ELSE py -m venv _setup_/standalone/.venv
+
 call _setup_/standalone/.venv/Scripts/Activate
 pip install -r _setup_/standalone/requirements.txt
 pip install -e .
