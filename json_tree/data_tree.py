@@ -37,7 +37,7 @@ class DataTreeWidget(QtWidgets.QWidget):
     def __init__(self, *args, **kwargs):
         super(DataTreeWidget, self).__init__(*args, **kwargs)
 
-        self.default_expand_depth = 1
+        self.default_expand_depth = 2
         self._root_type = None
 
         self.tree_view = QtWidgets.QTreeView()
@@ -108,7 +108,8 @@ class DataTreeWidget(QtWidgets.QWidget):
         @wraps(func)
         def inner(self, *args, **kwargs):
 
-            persistent_indices = self.filter_model.get_all_indices(persistent=True)
+            sel_indices = self.get_selected_indexes(persistent=True)
+            persistent_indices = self.tree_view.model().get_all_indices()
             are_expanded = {}
             for persistent_index in persistent_indices:
                 if self.tree_view.isExpanded(persistent_index):
@@ -121,9 +122,12 @@ class DataTreeWidget(QtWidgets.QWidget):
                 # self.tree_view.setExpanded(self.filter_model.index(0, 0, QtCore.QModelIndex()), True)
                 for index, is_expanded in are_expanded.items():
                     if index.isValid():
-                        # idx = self.filter_model.mapFromSource(index)
-                        # print(index)
-                        self.tree_view.setExpanded(index, True)
+                        filtered_index = self.filter_model.mapFromSource(index)
+                        self.tree_view.setExpanded(filtered_index, True)
+
+                for sel_index in sel_indices:
+                    filtered_index = self.filter_model.mapFromSource(sel_index)
+                    self.tree_view.setCurrentIndex(filtered_index)
 
         return inner
 
@@ -136,7 +140,7 @@ class DataTreeWidget(QtWidgets.QWidget):
         self.action_delete_selected_items()
 
     def action_copy_selected_items(self):
-        selected_data = self.get_selected_data()
+        selected_data = self.get_selected_data(as_raw_data=True)
         json_string = json.dumps(selected_data, indent=2)
         cb = QtWidgets.QApplication.clipboard()
         cb.setText(json_string)
@@ -174,8 +178,9 @@ class DataTreeWidget(QtWidgets.QWidget):
         index_data_map = self.get_selected_data(as_raw_data=False)
         index_parent_data = []
         for index, data in index_data_map.items():
-            item_parent_index = self.tree_model.get_index_from_item(index.parent().internalPointer())
+            item_parent_index = self.filter_model.mapToSource(index.parent())
             index_parent_data.append([item_parent_index, data])
+
         self.tree_model.add_data_to_indices(index_parent_data)
 
         if return_new_items:
@@ -225,9 +230,10 @@ class DataTreeWidget(QtWidgets.QWidget):
                 index.row()
             )
 
-    def get_selected_indexes(self, persistent=False):
+    def get_selected_indexes(self, mapped_to_src=True, persistent=False):
         selected_indexes = self.tree_view.selectionModel().selectedRows(data_tree_model.lk.col_key)
-        selected_indexes = [self.filter_model.mapToSource(i) for i in selected_indexes]
+        if mapped_to_src:
+            selected_indexes = [self.filter_model.mapToSource(i) for i in selected_indexes]
         if persistent:
             selected_indexes = [QtCore.QPersistentModelIndex(i) for i in selected_indexes]
         return selected_indexes
@@ -236,10 +242,11 @@ class DataTreeWidget(QtWidgets.QWidget):
         return [idx.internalPointer() for idx in self.get_selected_indexes()]
 
     def get_selected_data(self, as_raw_data=True, persistent=False):
-        selected_indices = self.get_selected_indexes(persistent=persistent)
+        selected_indices = self.get_selected_indexes(mapped_to_src=False, persistent=persistent)
 
         output_map = OrderedDict()
-        for key_index in selected_indices:
+        for filtered_index in selected_indices:
+            key_index = self.filter_model.mapToSource(filtered_index)
             item = key_index.internalPointer()  # type: data_tree_model.DataModelItem
             selected_key = item.data_key
 
@@ -259,12 +266,12 @@ class DataTreeWidget(QtWidgets.QWidget):
                 if isinstance(output_obj, lk.dict_types):
                     d = OrderedDict()
                     d[selected_key] = output_obj.get(selected_key)
-                    output_map[key_index] = d
+                    output_map[filtered_index] = d
 
                 elif isinstance(output_obj, lk.list_types):
                     list_index = int(selected_key[1:-1])
-                    output_map[key_index] = output_obj[list_index]
+                    output_map[filtered_index] = output_obj[list_index]
                 else:
-                    output_map[key_index] = output_obj
+                    output_map[filtered_index] = output_obj
 
         return output_map

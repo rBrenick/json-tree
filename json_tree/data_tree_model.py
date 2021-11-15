@@ -278,11 +278,12 @@ class DataModel(QtCore.QAbstractItemModel):
         return QtCore.QModelIndex()
 
     def add_data_to_indices(self, index_data_map, merge=True):
+        # self.layoutAboutToBeChanged.emit()
         for index_data in index_data_map:
-            index = index_data[0]
+            index = index_data[0]  # type: QtCore.QModelIndex
             data = index_data[1]
 
-            item = index.internalPointer()
+            item = index.internalPointer()  # type: DataModelItem # noqa
 
             data_length = get_data_length(data)
             start = item.child_count()
@@ -293,6 +294,7 @@ class DataModel(QtCore.QAbstractItemModel):
             self.add_data_to_model(data_value=data, parent_item=item, merge=merge, key_safety=True)
 
             self.endInsertRows()
+        # self.layoutChanged.emit()
 
     def add_data_to_model(self, data_key="", data_value=None, parent_item=None, merge=False, key_safety=False):
         if isinstance(data_value, lk.dict_types):
