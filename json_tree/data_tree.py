@@ -49,7 +49,6 @@ class DataTreeWidget(QtWidgets.QWidget):
         self.tree_model = data_tree_model.DataModel(self.tree_view)
 
         self.filter_model = data_tree_model.DataSortFilterProxyModel(self.tree_view, self.tree_model)
-        self.filter_model.setRecursiveFilteringEnabled(True)
         self.tree_view.setModel(self.filter_model)
 
         self.main_layout = QtWidgets.QVBoxLayout()

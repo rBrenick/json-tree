@@ -1,7 +1,11 @@
-import builtins
 import json
 import os
 import sys
+if sys.version_info.major > 2:
+    import builtins
+else:
+    builtins = __builtins__
+
 from collections import OrderedDict
 
 from json_tree.ui_utils import QtCore, QtWidgets
@@ -358,6 +362,8 @@ class DataSortFilterProxyModel(QtCore.QSortFilterProxyModel):
         self.setSourceModel(source_model)
         self.setSortCaseSensitivity(Qt.CaseInsensitive)
         self.setFilterCaseSensitivity(Qt.CaseInsensitive)
+        if sys.version_info.major > 2:
+            self.setRecursiveFilteringEnabled(True)
 
     def get_all_indices(self, index=None, persistent=False):
         if not index:
