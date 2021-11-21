@@ -107,26 +107,39 @@ class DataTreeWidget(QtWidgets.QWidget):
         @wraps(func)
         def inner(self, *args, **kwargs):
 
-            sel_indices = self.get_selected_indexes(persistent=True)
-            persistent_indices = self.tree_view.model().get_all_indices()
-            are_expanded = {}
-            for persistent_index in persistent_indices:
-                if self.tree_view.isExpanded(persistent_index):
-                    are_expanded[persistent_index] = True
+            # sel_indices = self.get_selected_indexes()
+            is_expanded = []
+            for index in self.tree_view.model().get_all_indices():
+                if not index.isValid():
+                    continue
+
+                if self.tree_view.isExpanded(index):
+                    internal_index = self.filter_model.mapToSource(index)
+                    is_expanded.append(internal_index.internalPointer())
 
             try:
                 return func(self, *args, **kwargs)
             finally:
 
-                # self.tree_view.setExpanded(self.filter_model.index(0, 0, QtCore.QModelIndex()), True)
-                for index, is_expanded in are_expanded.items():
-                    if index.isValid():
-                        filtered_index = self.filter_model.mapFromSource(index)
-                        self.tree_view.setExpanded(filtered_index, True)
+                for index in self.tree_view.model().get_all_indices():
+                    if not index.isValid():
+                        continue
 
-                for sel_index in sel_indices:
-                    filtered_index = self.filter_model.mapFromSource(sel_index)
-                    self.tree_view.setCurrentIndex(filtered_index)
+                    internal_index = self.filter_model.mapToSource(index)
+                    if internal_index.internalPointer() in is_expanded:
+                        self.tree_view.setExpanded(index, True)
+
+                # for item_guid in is_expanded:
+                #     self.tree_view.m
+                # self.tree_view.setExpanded(self.filter_model.index(0, 0, QtCore.QModelIndex()), True)
+                # for index, is_expanded in is_expanded.items():
+                #     if index.isValid():
+                #         filtered_index = self.filter_model.mapFromSource(index)
+                #         self.tree_view.setExpanded(filtered_index, True)
+                #
+                # for sel_index in sel_indices:
+                #     filtered_index = self.filter_model.mapFromSource(sel_index)
+                #     self.tree_view.setCurrentIndex(filtered_index)
 
         return inner
 
@@ -180,8 +193,10 @@ class DataTreeWidget(QtWidgets.QWidget):
             item_parent_index = self.filter_model.mapToSource(index.parent())
             index_parent_data.append([item_parent_index, data])
 
-        self.tree_model.add_data_to_indices(index_parent_data)
-
+        self.tree_model.add_data_to_indices(
+            index_parent_data,
+            key_safety=key_safety,
+        )
         if return_new_items:
             new_items = []
             for index in self.tree_model.get_all_indices():

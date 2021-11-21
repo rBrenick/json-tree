@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+
 if sys.version_info.major > 2:
     import builtins
 else:
@@ -75,13 +76,13 @@ class DataModelItem(object):
     def child_count(self):
         return len(self.children)
 
-    def add_child(self, child_item, index=None):
+    def add_child(self, child_item, list_index=None):
         child_item.parent = self
-        if index is None:
+        if list_index is None:
             child_item.row = self.child_count()
             self.children.append(child_item)
         else:
-            self.children.insert(index, child_item)
+            self.children.insert(list_index, child_item)
             for i, item in enumerate(self.children):
                 item.row = i  # update row mapping
 
@@ -148,7 +149,6 @@ class DataModel(QtCore.QAbstractItemModel):
         if not child.isValid():
             return QtCore.QModelIndex()
         child_item = child.internalPointer()
-        dir(child_item)  # run this to make sure child_item has a parent property
         parent_item = child_item.parent
         if parent_item == self.root_item:
             return QtCore.QModelIndex()
@@ -184,6 +184,7 @@ class DataModel(QtCore.QAbstractItemModel):
         item = index.internalPointer()  # type: DataModelItem
         if role == Qt.DisplayRole or role == Qt.EditRole:
             column = index.column()
+
             if column == lk.col_key:
                 if item.parent.raw_data_type in lk.list_types:
                     return "[{}]".format(item.parent.children.index(item))
@@ -208,7 +209,7 @@ class DataModel(QtCore.QAbstractItemModel):
         if not index.isValid():
             return False
 
-        if not value:
+        if value is None:
             return False
 
         if role == Qt.EditRole:
@@ -217,9 +218,11 @@ class DataModel(QtCore.QAbstractItemModel):
             column = index.column()
             if column == lk.col_key:
                 item.data_key = value
+
             if column == lk.col_value:
                 if not item.set_value(value):
                     return False
+
             if column == lk.col_type:
                 item.data_type = value
 
@@ -247,7 +250,7 @@ class DataModel(QtCore.QAbstractItemModel):
         item = index.internalPointer()  # type: DataModelItem
 
         item.parent.remove_child(item)
-        item.parent.add_child(item, index=destinationChild)
+        item.parent.add_child(item, list_index=destinationChild)
 
         self.endMoveRows()
         return True
@@ -268,10 +271,10 @@ class DataModel(QtCore.QAbstractItemModel):
 
     def set_data(self, data):
         self.beginResetModel()
-        self.root_item = DataModelItem(data_value=type(data)())
+        self.root_item = DataModelItem(data_key="root_item", data_value=type(data)())
         if data is None:
             return
-        self.add_data_to_model(data_value=data, parent_item=self.root_item)
+        self.add_data_to_model(data_value=data, parent_item=self.root_item, merge=True)
         self.endResetModel()
 
     def get_index_from_item(self, item):
@@ -281,8 +284,7 @@ class DataModel(QtCore.QAbstractItemModel):
                 return index
         return QtCore.QModelIndex()
 
-    def add_data_to_indices(self, index_data_map, merge=True):
-        # self.layoutAboutToBeChanged.emit()
+    def add_data_to_indices(self, index_data_map, merge=True, key_safety=True):
         for index_data in index_data_map:
             index = index_data[0]  # type: QtCore.QModelIndex
             data = index_data[1]
@@ -295,10 +297,9 @@ class DataModel(QtCore.QAbstractItemModel):
 
             self.beginInsertRows(index, start, end)
 
-            self.add_data_to_model(data_value=data, parent_item=item, merge=merge, key_safety=True)
+            self.add_data_to_model(data_value=data, parent_item=item, merge=merge, key_safety=key_safety)
 
             self.endInsertRows()
-        # self.layoutChanged.emit()
 
     def add_data_to_model(self, data_key="", data_value=None, parent_item=None, merge=False, key_safety=False):
         if isinstance(data_value, lk.dict_types):
@@ -329,8 +330,7 @@ class DataModel(QtCore.QAbstractItemModel):
 
     def get_data(self):
         output_obj = self.root_item.raw_data_type()  # create instance of root type
-        for child in self.root_item.children:
-            self.recursive_fill_data(output_obj, item=child)
+        self.recursive_fill_data(output_obj, item=self.root_item)
         return output_obj
 
     def recursive_fill_data(self, output_obj, item):
