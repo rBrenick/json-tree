@@ -122,6 +122,7 @@ class DataModel(QtCore.QAbstractItemModel):
         super(DataModel, self).__init__(*args, **kwargs)
 
         self.root_item = DataModelItem()
+        self.header_names = ("Key", "Value", "Type")
 
     ##########################################################################################
     # Overloads
@@ -132,18 +133,10 @@ class DataModel(QtCore.QAbstractItemModel):
         return Qt.ItemIsSelectable | Qt.ItemIsEnabled
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
-        if role != Qt.DisplayRole:
-            return None
+        if role == Qt.DisplayRole:
+            return self.header_names[section]
 
-        if orientation == Qt.Horizontal:
-            if section == lk.col_key:
-                return "Key"
-            elif section == lk.col_value:
-                return "Value"
-            elif section == lk.col_type:
-                return "Type"
-
-        return None
+        return super(DataModel, self).headerData(section, orientation, role)
 
     def parent(self, child):
         if not child.isValid():
