@@ -18,7 +18,7 @@ _json_tree_site_dir_setup()
 try:
     import json_tree
     json_tree.startup()
-except StandardError as e:
+except Exception as e:
     print(e)
 
 
