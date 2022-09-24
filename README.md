@@ -1,6 +1,8 @@
 # json-tree
 Editor for json/standard python data
 
+The idea was to rewrite my old JSON Editor with proper Model/View stuff. But couldn't figure out the best way to approach re-ordering items. So unless inspiration strikes sometime in the future, this is parked.
+
 ![tool header image](docs/header_image.png)
 
 
